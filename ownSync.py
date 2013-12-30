@@ -167,7 +167,7 @@ class ownClient():
       self.updateTree()
 
       for d in self.DIRS:
-        if f[:len(base)] == base:
+        if d[:len(base)] == base:
           newpath = fixPath(d[len(base):])
           if newpath not in DIRS:
             try:
@@ -251,7 +251,7 @@ class ownClient():
       DIRS = self.getLocalDIRS(path)
 
       for d in self.DIRS:
-        if f[:len(base)] == base:
+        if d[:len(base)] == base:
           newpath = fixPath(d[len(base):])
           if newpath not in DIRS:
             try:
@@ -262,7 +262,10 @@ class ownClient():
       for d in DIRS:
         newpath = fixPath("%s/%s"%(base,d))
         if newpath not in self.DIRS and newpath != "/":
-          shutil.rmtree("%s/%s"%(path,d))
+          try:
+            shutil.rmtree("%s/%s"%(path,d))
+          except:
+            pass
           
       FILES = self.getLocalFILES(path)
 
@@ -356,7 +359,7 @@ if __name__ == "__main__":
   X = ownClient(Args['url'])
   X.set_auth(Args['user'], pw)
 
-  X.properties()
+  X.updateTree()
   if Args['type'] == None or Args['type'].lower() == "both":
     X.syncBOTH(Args['local'], base=Args['rpath'])
   elif Args['type'].lower() == "to":
