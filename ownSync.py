@@ -69,7 +69,7 @@ class ownClient():
                 try:
                   T = time.strptime(lastMod.text,"%a, %d %b %Y %H:%M:%S GMT")
                   newEntry['lastMod'] = int((time.mktime(T)-time.timezone)*1000)
-                except Exception, e:
+                except Exception as e:
                   self.log.error("Problem converting time stamp: %s, %s"%(newEntry['name'], lastMod.text))
                   newEntry['lastMod'] = 0
               if length != None:
@@ -155,6 +155,7 @@ class ownClient():
 
 
   def syncBOTH(self, path, base="/"):
+    self.updateTree(path=base)
     base = fixPath(base)
     if os.path.isdir(path):
       FILES = self.getLocalFILES(path)
@@ -172,7 +173,7 @@ class ownClient():
           if newpath not in DIRS:
             try:
               os.makedirs("%s/%s"%(path,newpath))
-            except Exception, e:
+            except Exception as e:
               pass
       
       for f in FILES:
@@ -204,6 +205,7 @@ class ownClient():
       self.updateTree()
 
   def syncTO(self, path, base="/"):
+    self.updateTree(path=base)
     base = fixPath(base)
     if os.path.isdir(path):
       FILES = self.getLocalFILES(path)
@@ -245,27 +247,31 @@ class ownClient():
       self.updateTree()
 
   def syncFROM(self, path, base="/"):
+    self.log.info("Syncing from host to %s from %s"%(path, base))
+    self.updateTree(path=base)
     base = fixPath(base)
     if os.path.isdir(path):
-      FILES = self.getLocalFILES(path)
       DIRS = self.getLocalDIRS(path)
+
+      for d in DIRS:
+        newpath = fixPath("%s/%s"%(base,d))
+        if newpath not in self.DIRS and newpath != "/":
+          try:
+            self.log.debug("Removing local directory %s/%s"%(path,d))
+            shutil.rmtree("%s/%s"%(path,d))
+          except:
+            pass
 
       for d in self.DIRS:
         if d[:len(base)] == base:
           newpath = fixPath(d[len(base):])
           if newpath not in DIRS:
             try:
+              self.log.debug("Creating local directory %s/%s"%(path,newpath))
               os.makedirs("%s/%s"%(path,newpath))
-            except Exception, e:
+            except Exception as e:
               pass
 
-      for d in DIRS:
-        newpath = fixPath("%s/%s"%(base,d))
-        if newpath not in self.DIRS and newpath != "/":
-          try:
-            shutil.rmtree("%s/%s"%(path,d))
-          except:
-            pass
           
       FILES = self.getLocalFILES(path)
 
@@ -273,7 +279,7 @@ class ownClient():
         if f[:len(base)] == base:
           newfile = fixPath(f[len(base):])
           if newfile not in FILES:
-            self.log.info("Downloading Updated file %s"%(f))
+            self.log.info("Creating New file %s"%(f))
             open("%s/%s"%(path,newfile), "w").write(self.getFile(f))
             os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
           elif FILES[newfile]['lastMod'] != self.FILES[f]['lastMod']:
@@ -284,6 +290,7 @@ class ownClient():
       for f in FILES:
         newfile = fixPath("%s/%s"%(base,f))
         if newfile not in self.FILES:
+          self.log.info("Removing Local File: %s"%(f))
           os.remove("%s/%s"%(path,f))
       self.updateTree()
 
@@ -343,11 +350,13 @@ if __name__ == "__main__":
   parser.add_argument('--type', help=t, required=False)
   Args = vars(parser.parse_args(sys.argv))
 
-  print "Checking URL..."
+  print "Checking URL...  ",
   Args['url'] = getOwn(Args['url'])
   if Args['url'] == None:
     print "Problem with URL!!!"
     sys.exit(1)
+  else:
+    print "GOOD: %s"%(Args['url'])
 
   pw = getpass.getpass()
 
@@ -359,7 +368,6 @@ if __name__ == "__main__":
   X = ownClient(Args['url'])
   X.set_auth(Args['user'], pw)
 
-  X.updateTree()
   if Args['type'] == None or Args['type'].lower() == "both":
     X.syncBOTH(Args['local'], base=Args['rpath'])
   elif Args['type'].lower() == "to":
