@@ -37,9 +37,9 @@ class ownClient():
     """
     Updates the Local dictionary of directories and files
     """
-    self.log.debug("updating Local DataTrees")
+    self.log.debug("updating Local DataTrees %s"%path)
     DATA = "<?xml version='1.0' encoding='UTF-8' ?><propfind xmlns:D='DAV:'><prop><D:allprop/></prop></propfind>"
-    r, c = self.http.request(self.url+path, 'PROPFIND', body=DATA)
+    r, c = self.http.request(self.url+"/"+path, 'PROPFIND', body=DATA)
     if r['status'] != '207':
       self.good = False
       return
@@ -68,7 +68,7 @@ class ownClient():
               if lastMod != None:
                 try:
                   T = time.strptime(lastMod.text,"%a, %d %b %Y %H:%M:%S GMT")
-                  newEntry['lastMod'] = int((time.mktime(T)-time.timezone)*1000)
+                  newEntry['lastMod'] = int((time.mktime(T)-time.altzone)*1000)
                 except Exception as e:
                   self.log.error("Problem converting time stamp: %s, %s"%(newEntry['name'], lastMod.text))
                   newEntry['lastMod'] = 0
@@ -86,12 +86,12 @@ class ownClient():
     if "/" in self.DIRS:
       del(self.DIRS["/"])
 
-  def updateModTime(self, path, time):
+  def updateModTime(self, path, ftime):
     """
     This Call updates the modified time of a file in owncloud.
     """
-    self.log.debug("Updating Modified time of %s to %d"%(path, time))
-    DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propertyupdate xmlns:D='DAV:'><D:set><D:prop><D:lastmodified>%d</D:lastmodified></D:prop></D:set></D:propertyupdate>"%(time)
+    self.log.debug("Updating Modified time of %s to %d"%(path, ftime))
+    DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propertyupdate xmlns:D='DAV:'><D:set><D:prop><D:lastmodified>%d</D:lastmodified></D:prop></D:set></D:propertyupdate>"%(ftime)
     r, c = self.http.request(self.url+"/"+urllib.quote(path), 'PROPPATCH', body=DATA)
 
   def mkdir(self, path):
@@ -165,7 +165,6 @@ class ownClient():
         newpath = fixPath("%s/%s"%(base,d))
         if newpath not in self.DIRS:
           self.mkdir(newpath)
-      self.updateTree()
 
       for d in self.DIRS:
         if d[:len(base)] == base:
@@ -188,7 +187,7 @@ class ownClient():
           self.log.info("Uploading New File %s"%(f))
           self.addFile("%s/%s"%(path,f), fixPath(os.path.dirname(newfile)+"/"))
           self.updateModTime(newfile, FILES[f]['lastMod']/1000)
-      self.updateTree()
+      self.updateTree(path=base)
 
       for f in self.FILES:
         if f[:len(base)] == base:
@@ -202,7 +201,7 @@ class ownClient():
             self.log.info("Downloading new file %s"%(f))
             open("%s/%s"%(path,newfile), "w").write(self.getFile(f))
             os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
-      self.updateTree()
+      self.updateTree(path=base)
 
   def syncTO(self, path, base="/"):
     self.updateTree(path=base)
@@ -210,7 +209,6 @@ class ownClient():
     if os.path.isdir(path):
       FILES = self.getLocalFILES(path)
       DIRS = self.getLocalDIRS(path)
-
       for d in DIRS:
         newpath = fixPath("%s/%s"%(base,d))
         if newpath not in self.DIRS:
@@ -221,8 +219,7 @@ class ownClient():
           newpath = fixPath(d[len(base):])
           if newpath not in DIRS and newpath != "/" and newpath != "":
             self.delete(d)
-
-      self.updateTree()
+      self.updateTree(path=base)
 
       for f in FILES:
         newfile = fixPath("%s/%s"%(base,f))
@@ -237,14 +234,13 @@ class ownClient():
           self.addFile("%s/%s"%(path,f), fixPath(os.path.dirname(newfile)+"/"))
           self.updateModTime(newfile, FILES[f]['lastMod']/1000)
 
-      self.updateTree()
       
       for f in self.FILES:
         if f[:len(base)] == base:
           newfile = fixPath(f[len(base):])
           if newfile not in FILES:
             self.delete(f)
-      self.updateTree()
+      self.updateTree(path=base)
 
   def syncFROM(self, path, base="/"):
     self.log.info("Syncing from host to %s from %s"%(path, base))
@@ -292,7 +288,7 @@ class ownClient():
         if newfile not in self.FILES:
           self.log.info("Removing Local File: %s"%(f))
           os.remove("%s/%s"%(path,f))
-      self.updateTree()
+      self.updateTree(path=base)
 
 
 
