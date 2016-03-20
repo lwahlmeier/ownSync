@@ -16,6 +16,7 @@ setup(name='ownSync',
       classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: End Users/Desktop',
+        'Environment :: Console',
         'Topic :: Internet',
         'Natural Language :: English',
         'Operating System :: POSIX',
