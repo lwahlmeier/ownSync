@@ -17,6 +17,8 @@ setup(name='ownSync',
         'Development Status :: 4 - Beta',
         'Intended Audience :: End Users/Desktop',
         'Topic :: Internet',
+        'Natural Language :: English',
+        'Operating System :: POSIX',
         'License :: OSI Approved :: MIT BSD License',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7'
