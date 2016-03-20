@@ -3,8 +3,10 @@
 #from distutils.core import setup
 from setuptools import setup
 
+VERSION = '0.2.0'
+
 setup(name='ownSync',
-      version='0.2.0',
+      version=VERSION,
       description='Python ownCloud file sync utility',
       author='Luke Wahlmeier',
       author_email='lwahlmeier@gmail.com',
@@ -20,9 +22,10 @@ setup(name='ownSync',
         'Topic :: Internet',
         'Natural Language :: English',
         'Operating System :: POSIX',
-        'License :: OSI Approved :: MIT BSD License',
+        'License :: OSI Approved :: BSD License',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7'
       ],
       keywords='owncloud files sync sychronize',
+      download_url = 'https://github.com/lwahlmeier/ownSync/tarball/'+VERSION,
      )
