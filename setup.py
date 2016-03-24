@@ -3,7 +3,7 @@
 #from distutils.core import setup
 from setuptools import setup
 
-VERSION = '0.2.0'
+VERSION = '0.5.0'
 
 setup(name='ownSync',
       version=VERSION,
