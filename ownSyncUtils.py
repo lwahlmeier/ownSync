@@ -1,6 +1,18 @@
+try:
+  from urllib.parse import unquote as urlunquote
+  from urllib.parse import quote as urlquote
+except:
+  import urllib
+  urlunquote = urllib.unquote
+  urlquote = urllib.quote
+#  from urllib.urllib.unquote import unquote as urlunquote
+#  from urllib.quote import quote as urlquote
+
 import httplib2, os, shutil
-import urllib, time, logging, datetime
+import time, logging, datetime
 import xml.etree.ElementTree as ET
+
+
 
 """
 ownSync is a module used to sync files to/from ownCloud.
@@ -35,8 +47,8 @@ class ownClient():
     Updates the Local dictionary of directories and files
     """
     self.log.debug("updating Local DataTrees %s"%path)
-    DATA = "<?xml version='1.0' encoding='UTF-8' ?><propfind xmlns:D='DAV:'><prop><D:allprop/></prop></propfind>"
-    r, c = self.http.request(self.url+"/"+path, 'PROPFIND', body=DATA)
+    DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propfind xmlns:D='DAV:'><D:prop><D:allprop/></D:prop></D:propfind>"
+    r, c = self.http.request(self.url+"/"+path, 'PROPFIND')
     if r['status'] != '207':
       self.good = False
       return
@@ -49,7 +61,7 @@ class ownClient():
         newEntry = dict()
         for d in i.getchildren():
           if d.tag == "{DAV:}href":
-            name = urllib.unquote(d.text[len(self.base)+1:])
+            name = urlunquote(d.text[len(self.base)+1:])
             newEntry['name'] = name
           elif d.tag == "{DAV:}propstat":
             X = d.find("{DAV:}prop")
@@ -89,14 +101,14 @@ class ownClient():
     """
     self.log.debug("Updating Modified time of %s to %d"%(path, ftime))
     DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propertyupdate xmlns:D='DAV:'><D:set><D:prop><D:lastmodified>%d</D:lastmodified></D:prop></D:set></D:propertyupdate>"%(ftime)
-    r, c = self.http.request(self.url+"/"+urllib.quote(path), 'PROPPATCH', body=DATA)
+    r, c = self.http.request(self.url+"/"+urlquote(path), 'PROPPATCH', body=DATA)
 
   def mkdir(self, path):
     """
     mkdir creates a dirctory on owncloud, it will create the full path even if parent directories do not exist
     """
     self.log.debug("Creating Path %s"%(path))
-    r, c = self.http.request(self.url+"/"+urllib.quote(path), "MKCOL")
+    r, c = self.http.request(self.url+"/"+urlquote(path), "MKCOL")
     
 
   def delete(self, path):
@@ -104,14 +116,14 @@ class ownClient():
     delete deletes any path/file on the owncloud server, and will do so recursivly.
     """
     self.log.debug("Deleting Path %s"%(path))
-    r, c = self.http.request(self.url+"/"+urllib.quote(path), "DELETE")
+    r, c = self.http.request(self.url+"/"+urlquote(path), "DELETE")
 
   def getFile(self, path):
     """
     getFile retireves the contents of the give file
     """
     self.log.debug("Getting File contents: %s"%(path))
-    r, c = self.http.request(self.url+"/"+urllib.quote(path))
+    r, c = self.http.request(self.url+"/"+urlquote(path))
     if r['status'] == "200":
       return c
 
@@ -124,7 +136,7 @@ class ownClient():
     fp = open(newFile, "r")
     if path not in self.DIRS:
       self.mkdir(path)
-    r, c = self.http.request(self.url+"/%s/%s"%(urllib.quote(path), urllib.quote(os.path.basename(newFile))), "PUT", body=fp.read())
+    r, c = self.http.request(self.url+"/%s/%s"%(urlquote(path), urlquote(os.path.basename(newFile))), "PUT", body=fp.read())
 
   def getLocalDIRS(self, path):
     DIRS = dict()

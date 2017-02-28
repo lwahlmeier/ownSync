@@ -18,13 +18,13 @@ if __name__ == "__main__":
   parser.add_argument('--type', help=t, required=False)
   Args = vars(parser.parse_args(sys.argv))
 
-  print "Checking URL...  ",
+  print("Checking URL...  ")
   Args['url'] = getOwn(Args['url'])
   if Args['url'] == None:
-    print "Problem with URL!!!"
+    print("Problem with URL!!!")
     sys.exit(1)
   else:
-    print "GOOD: %s"%(Args['url'])
+    print("GOOD: {}".format(Args['url']))
 
   pw = getpass.getpass()
 
