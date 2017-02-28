@@ -133,10 +133,10 @@ class ownClient():
     that file name will be used as its name.
     """
     self.log.debug("Adding New File: %s/%s"%(path, os.path.basename(newFile)))
-    fp = open(newFile, "r")
+    data = open(newFile, "rb").read()
     if path not in self.DIRS:
       self.mkdir(path)
-    r, c = self.http.request(self.url+"/%s/%s"%(urlquote(path), urlquote(os.path.basename(newFile))), "PUT", body=fp.read())
+    r, c = self.http.request(str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", body=data)
 
   def getLocalDIRS(self, path):
     DIRS = dict()
@@ -284,12 +284,12 @@ class ownClient():
         if f[:len(base)] == base:
           newfile = fixPath(f[len(base):])
           if newfile not in FILES:
-            self.log.info("Creating New file %s"%(f))
-            open("%s/%s"%(path,newfile), "w").write(self.getFile(f))
+            self.log.info("Creating New file {} {}".format(f, newfile))
+            open("%s/%s"%(path,newfile), "wb").write(self.getFile(f))
             os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
           elif FILES[newfile]['lastMod'] != self.FILES[f]['lastMod']:
             self.log.info("Downloading Updated file %s"%(f))
-            open("%s/%s"%(path,newfile), "w").write(self.getFile(f))
+            open("%s/%s"%(path,newfile), "wb").write(self.getFile(f))
             os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
 
       for f in FILES:
