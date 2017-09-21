@@ -37,6 +37,10 @@ The options are:
                         help="remote path to sync into (Default: /)",
                         required=False,
                         default="/")
+    parser.add_argument('--passcmd',
+                        help="Use this command to get password instead of "
+                             "asking via prompt.",
+                        required=False)
     parser.add_argument('--type', help=t, required=False)
     Args = vars(parser.parse_args(sys.argv))
 
@@ -48,7 +52,12 @@ The options are:
     else:
         print("GOOD: {}".format(Args['url']))
 
-    pw = getpass.getpass()
+
+    if Args['passcmd'] is None:
+        pw = getpass.getpass()
+    else:
+        import subprocess
+        pw = subprocess.check_output(Args['passcmd'].split()).strip()
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
