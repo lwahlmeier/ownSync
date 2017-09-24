@@ -1,3 +1,15 @@
+"""
+ownSync is a module used to sync files to/from ownCloud.
+"""
+import logging
+import os
+import shutil
+import time
+import xml.etree.ElementTree as ET
+
+import httplib2
+
+
 try:
   from urllib.parse import unquote as urlunquote
   from urllib.parse import quote as urlquote
@@ -8,21 +20,11 @@ except:
 #  from urllib.urllib.unquote import unquote as urlunquote
 #  from urllib.quote import quote as urlquote
 
-import httplib2, os, shutil
-import time, logging, datetime
-import xml.etree.ElementTree as ET
-
-
-
-"""
-ownSync is a module used to sync files to/from ownCloud.
-"""
 
 class ownClient():
-
   """
-  ownClient main class for the ownSync utility, it makes a connection to the ownCloud
-  server and then allows modification and retrival of files.
+  ownClient main class for the ownSync utility, it makes a connection to the
+  ownCloud server and then allows modification and retrival of files.
   """
   def __init__(self, url):
     """
@@ -46,9 +48,9 @@ class ownClient():
     """
     Updates the Local dictionary of directories and files
     """
-    self.log.debug("updating Local DataTrees %s"%path)
+    self.log.debug("updating Local DataTrees %s" % path)
     DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propfind xmlns:D='DAV:'><D:prop><D:allprop/></D:prop></D:propfind>"
-    r, c = self.http.request(self.url+"/"+path, 'PROPFIND')
+    r, c = self.http.request(self.url + "/" + path, 'PROPFIND')
     if r['status'] != '207':
       self.good = False
       return
@@ -61,34 +63,36 @@ class ownClient():
         newEntry = dict()
         for d in i.getchildren():
           if d.tag == "{DAV:}href":
-            name = urlunquote(d.text[len(self.base)+1:])
+            name = urlunquote(d.text[len(self.base) + 1:])
             newEntry['name'] = name
           elif d.tag == "{DAV:}propstat":
             X = d.find("{DAV:}prop")
-            if X != None:
+            if X is not None:
               ID = X.find("{http://owncloud.org/ns}id")
               ETAG = X.find("{DAV:}etag")
               lastMod = X.find("{DAV:}getlastmodified")
               length = X.find("{DAV:}getcontentlength")
-#              if ID != None:
+#              if ID is not None:
 #                newEntry['id'] = ID.text
-#              if ETAG != None:
+#              if ETAG is not None:
 #                newEntry['etag'] = ETAG.text
-              if lastMod != None:
+              if lastMod is not None:
                 try:
-                  T = time.strptime(lastMod.text,"%a, %d %b %Y %H:%M:%S GMT")
-                  newEntry['lastMod'] = int((time.mktime(T)-time.altzone)*1000)
+                  fmt = "%a, %d %b %Y %H:%M:%S GMT"
+                  T = time.strptime(lastMod.text, fmt)
+                  newEntry['lastMod'] = int((time.mktime(T) - time.altzone) * 1000)
                 except Exception as e:
-                  self.log.error("Problem converting time stamp: %s, %s"%(newEntry['name'], lastMod.text))
+                  self.log.error("Problem converting time stamp: %s, %s"
+                           % (newEntry['name'], lastMod.text))
                   newEntry['lastMod'] = 0
-              if length != None:
+              if length is not None:
                 newEntry['size'] = length.text
                 newEntry['type'] = "FILE"
                 self.FILES[newEntry['name']] = newEntry
               else:
                 newEntry['type'] = "DIR"
                 self.DIRS[newEntry['name']] = newEntry
-        if newEntry['type'] == "DIR" and newEntry['name']!=path:
+        if newEntry['type'] == "DIR" and newEntry['name'] != path:
           self.updateTree(newEntry['name'])
     if "/" in self.FILES:
       del(self.FILES["/"])
@@ -99,55 +103,55 @@ class ownClient():
     """
     This Call updates the modified time of a file in owncloud.
     """
-    self.log.debug("Updating Modified time of %s to %d"%(path, ftime))
-    DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propertyupdate xmlns:D='DAV:'><D:set><D:prop><D:lastmodified>%d</D:lastmodified></D:prop></D:set></D:propertyupdate>"%(ftime)
-    r, c = self.http.request(self.url+"/"+urlquote(path), 'PROPPATCH', body=DATA)
+    self.log.debug("Updating Modified time of %s to %d" % (path, ftime))
+    DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propertyupdate xmlns:D='DAV:'><D:set><D:prop><D:lastmodified>%d</D:lastmodified></D:prop></D:set></D:propertyupdate>" % (ftime)
+    r, c = self.http.request(self.url + "/" + urlquote(path), 'PROPPATCH', body=DATA)
 
   def mkdir(self, path):
     """
     mkdir creates a dirctory on owncloud, it will create the full path even if parent directories do not exist
     """
-    self.log.debug("Creating Path %s"%(path))
-    r, c = self.http.request(self.url+"/"+urlquote(path), "MKCOL")
-    
+    self.log.debug("Creating Path  %s" % (path))
+    r, c = self.http.request(self.url + "/" + urlquote(path), "MKCOL")
 
   def delete(self, path):
     """
     delete deletes any path/file on the owncloud server, and will do so recursivly.
     """
-    self.log.debug("Deleting Path %s"%(path))
-    r, c = self.http.request(self.url+"/"+urlquote(path), "DELETE")
+    self.log.debug("Deleting Path %s" % (path))
+    r, c = self.http.request(self.url + "/" + urlquote(path), "DELETE")
 
   def getFile(self, path):
     """
     getFile retireves the contents of the give file
     """
-    self.log.debug("Getting File contents: %s"%(path))
-    r, c = self.http.request(self.url+"/"+urlquote(path))
+    self.log.debug("Getting File contents: %s" % (path))
+    r, c = self.http.request(self.url + "/" + urlquote(path))
     if r['status'] == "200":
       return c
 
   def addFile(self, newFile, path):
     """
-    This adds the given file to the owncloud server.  newFile is a string path to a local file and 
-    that file name will be used as its name.
+    This adds the given file to the owncloud server. newFile is a string path to a local file and that file name
+    will be used as its name.
     """
-    self.log.debug("Adding New File: %s/%s"%(path, os.path.basename(newFile)))
+    self.log.debug("Adding New File: %s/%s" % (path, os.path.basename(newFile)))
     data = open(newFile, "rb").read()
     if path not in self.DIRS:
       self.mkdir(path)
-    r, c = self.http.request(str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", body=data)
+    r, c = self.http.request(
+      str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", body=data)
 
   def getLocalDIRS(self, path):
     DIRS = dict()
     if os.path.isdir(path):
       for root, dirs, files in os.walk(path):
         for d in dirs:
-          R = root+"/"+d
-          X = fixPath("/"+R[len(path):]+"/")
+          R = root + "/" + d
+          X = fixPath("/" + R[len(path):] + "/")
           DIRS[X] = dict()
-          DIRS[X]['type']="DIR"
-          DIRS[X]['lastMod']=int(os.path.getmtime(R))*1000
+          DIRS[X]['type'] = "DIR"
+          DIRS[X]['lastMod'] = int(os.path.getmtime(R)) * 1000
     return DIRS
 
   def getLocalFILES(self, path):
@@ -155,13 +159,12 @@ class ownClient():
     if os.path.isdir(path):
       for root, dirs, files in os.walk(path):
         for f in files:
-          R = root+"/"+f
+          R = root + "/" + f
           X = R[len(path):]
           FILES[X] = dict()
-          FILES[X]['type']="FILE"
-          FILES[X]['lastMod']=int(os.path.getmtime(R))*1000
+          FILES[X]['type'] = "FILE"
+          FILES[X]['lastMod'] = int(os.path.getmtime(R)) * 1000
     return FILES
-
 
   def syncBOTH(self, path, base="/"):
     self.updateTree(path=base)
@@ -171,7 +174,7 @@ class ownClient():
       DIRS = self.getLocalDIRS(path)
 
       for d in DIRS:
-        newpath = fixPath("%s/%s"%(base,d))
+        newpath = fixPath("%s/%s" % (base, d))
         if newpath not in self.DIRS:
           self.mkdir(newpath)
 
@@ -180,22 +183,22 @@ class ownClient():
           newpath = fixPath(d[len(base):])
           if newpath not in DIRS:
             try:
-              os.makedirs("%s/%s"%(path,newpath))
+              os.makedirs("%s/%s" % (path, newpath))
             except Exception as e:
               pass
-      
+
       for f in FILES:
-        newfile = fixPath("%s/%s"%(base,f))
+        newfile = fixPath("%s/%s" % (base, f))
         if newfile in self.FILES:
           if FILES[f]['lastMod'] > self.FILES[newfile]['lastMod']:
-            self.log.info("Uploading Updated File %s"%(f))
+            self.log.info("Uploading Updated File %s" % (f))
             self.delete(newfile)
-            self.addFile("%s/%s"%(path,f), fixPath(os.path.dirname(newfile)+"/"))
-            self.updateModTime(newfile, FILES[f]['lastMod']/1000)
+            self.addFile("%s/%s" % (path, f), fixPath(os.path.dirname(newfile) + "/"))
+            self.updateModTime(newfile, FILES[f]['lastMod'] / 1000)
         else:
-          self.log.info("Uploading New File %s"%(f))
-          self.addFile("%s/%s"%(path,f), fixPath(os.path.dirname(newfile)+"/"))
-          self.updateModTime(newfile, FILES[f]['lastMod']/1000)
+          self.log.info("Uploading New File %s" % (f))
+          self.addFile("%s/%s" % (path, f), fixPath(os.path.dirname(newfile) + "/"))
+          self.updateModTime(newfile, FILES[f]['lastMod'] / 1000)
       self.updateTree(path=base)
 
       for f in self.FILES:
@@ -203,13 +206,15 @@ class ownClient():
           newfile = fixPath(f[len(base):])
           if newfile in FILES:
             if self.FILES[f]['lastMod'] > FILES[newfile]['lastMod']:
-              self.log.info("Downloading Updated file %s"%(f))
-              open("%s/%s"%(path,newfile), "w").write(self.getFile(f))
-              os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
+              self.log.info("Downloading Updated file %s" % (f))
+              with open("%s/%s" % (path, newfile), "w") as fd:
+                fd.write(self.getFile(f))
+              os.utime("%s/%s" % (path, newfile), (self.FILES[f]['lastMod'] / 1000, self.FILES[f]['lastMod'] / 1000))
           else:
-            self.log.info("Downloading new file %s"%(f))
-            open("%s/%s"%(path,newfile), "w").write(self.getFile(f))
-            os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
+            self.log.info("Downloading new file %s" % (f))
+            with open("%s/%s" % (path, newfile), "w") as fd:
+              fd.write(self.getFile(f))
+            os.utime("%s/%s" % (path, newfile), (self.FILES[f]['lastMod'] / 1000, self.FILES[f]['lastMod'] / 1000))
       self.updateTree(path=base)
 
   def syncTO(self, path, base="/"):
@@ -219,31 +224,30 @@ class ownClient():
       FILES = self.getLocalFILES(path)
       DIRS = self.getLocalDIRS(path)
       for d in DIRS:
-        newpath = fixPath("%s/%s"%(base,d))
+        newpath = fixPath("%s/%s" % (base, d))
         if newpath not in self.DIRS:
           self.mkdir(newpath)
 
       for d in self.DIRS:
         if d[:len(base)] == base:
           newpath = fixPath(d[len(base):])
-          if newpath not in DIRS and newpath != "/" and newpath != "":
+          if (newpath not in DIRS and newpath != "/" and newpath != ""):
             self.delete(d)
       self.updateTree(path=base)
 
       for f in FILES:
-        newfile = fixPath("%s/%s"%(base,f))
+        newfile = fixPath("%s/%s" % (base, f))
         if newfile in self.FILES:
           if FILES[f]['lastMod'] != self.FILES[newfile]['lastMod']:
-            self.log.info("Uploading Updated File %s"%(f))
+            self.log.info("Uploading Updated File %s" % (f))
             self.delete(newfile)
-            self.addFile("%s/%s"%(path,f), fixPath(os.path.dirname(newfile)+"/"))
-            self.updateModTime(newfile, FILES[f]['lastMod']/1000)
+            self.addFile("%s/%s" % (path, f), fixPath(os.path.dirname(newfile) + "/"))
+            self.updateModTime(newfile, FILES[f]['lastMod'] / 1000)
         else:
-          self.log.info("Uploading New File %s"%(f))
-          self.addFile("%s/%s"%(path,f), fixPath(os.path.dirname(newfile)+"/"))
-          self.updateModTime(newfile, FILES[f]['lastMod']/1000)
+          self.log.info("Uploading New File %s" % (f))
+          self.addFile("%s/%s" % (path, f), fixPath(os.path.dirname(newfile) + "/"))
+          self.updateModTime(newfile, FILES[f]['lastMod'] / 1000)
 
-      
       for f in self.FILES:
         if f[:len(base)] == base:
           newfile = fixPath(f[len(base):])
@@ -252,18 +256,18 @@ class ownClient():
       self.updateTree(path=base)
 
   def syncFROM(self, path, base="/"):
-    self.log.info("Syncing from host to %s from %s"%(path, base))
+    self.log.info("Syncing from host to %s from %s" % (path, base))
     self.updateTree(path=base)
     base = fixPath(base)
     if os.path.isdir(path):
       DIRS = self.getLocalDIRS(path)
 
       for d in DIRS:
-        newpath = fixPath("%s/%s"%(base,d))
+        newpath = fixPath("%s/%s" % (base, d))
         if newpath not in self.DIRS and newpath != "/":
           try:
-            self.log.debug("Removing local directory %s/%s"%(path,d))
-            shutil.rmtree("%s/%s"%(path,d))
+            self.log.debug("Removing local directory %s/%s" % (path, d))
+            shutil.rmtree("%s/%s" % (path, d))
           except:
             pass
 
@@ -272,42 +276,42 @@ class ownClient():
           newpath = fixPath(d[len(base):])
           if newpath not in DIRS:
             try:
-              self.log.debug("Creating local directory %s/%s"%(path,newpath))
-              os.makedirs("%s/%s"%(path,newpath))
+              self.log.debug("Creating local directory %s/%s" % (path, newpath))
+              os.makedirs("%s/%s" % (path, newpath))
             except Exception as e:
               pass
 
-          
       FILES = self.getLocalFILES(path)
 
       for f in self.FILES:
         if f[:len(base)] == base:
           newfile = fixPath(f[len(base):])
           if newfile not in FILES:
-            self.log.info("Creating New file {} {}".format(f, newfile))
-            open("%s/%s"%(path,newfile), "wb").write(self.getFile(f))
-            os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
+            self.log.info( "Creating New file {} {}".format(f, newfile))
+            with open("%s/%s" % (path, newfile), "wb") as fd:
+              fd.write(self.getFile(f))
+            os.utime("%s/%s" % (path, newfile), (self.FILES[f]['lastMod'] / 1000, self.FILES[f]['lastMod'] / 1000))
           elif FILES[newfile]['lastMod'] != self.FILES[f]['lastMod']:
-            self.log.info("Downloading Updated file %s"%(f))
-            open("%s/%s"%(path,newfile), "wb").write(self.getFile(f))
-            os.utime("%s/%s"%(path,newfile), (self.FILES[f]['lastMod']/1000, self.FILES[f]['lastMod']/1000))
+            self.log.info("Downloading Updated file %s" % (f))
+            with open("%s/%s" % (path, newfile), "wb") as fd:
+              fd.write(self.getFile(f))
+            os.utime("%s/%s" % (path, newfile), (self.FILES[f]['lastMod'] / 1000, self.FILES[f]['lastMod'] / 1000))
 
       for f in FILES:
-        newfile = fixPath("%s/%s"%(base,f))
+        newfile = fixPath("%s/%s" % (base, f))
         if newfile not in self.FILES:
-          self.log.info("Removing Local File: %s"%(f))
-          os.remove("%s/%s"%(path,f))
+          self.log.info("Removing Local File: %s" % (f))
+          os.remove("%s/%s" % (path, f))
       self.updateTree(path=base)
-
 
 
 def fixPath(path):
   """
-  This class kind of sucks is makes sure that paths have the correct number of /'s in them.
-  I could not get any of the os.path fuctions to do this reliably, not sure why.
+  This class kind of sucks it makes sure that paths have the correct number
+  of /'s in them. I could not get any of the os.path fuctions to do this reliably, not sure why.
   """
   if path[0] != "/":
-    path = "/"+path
+    path = "/" + path
   while path.find("//") != -1:
     path = path.replace("//", "/")
   return path
@@ -318,13 +322,13 @@ def getOwn(url):
   Simple class to verify a url is an ownCloud instance
   """
   http = httplib2.Http(disable_ssl_certificate_validation=True)
-  if url.find("remote.php")==-1 and url[-1:] == "/":
-    url = url+"remote.php/webdav"
+  if url.find("remote.php") == -1 and url[-1:] == "/":
+    url = url + "remote.php/webdav"
   elif url.find("remote.php") != 1 and url[-1:] != "/":
     if url.find("webdav") == -1:
-      url = url+"/webdav"
-  elif url.find("remote.php")==-1 and url[-1:] != "/":
-    url = url+"/remote.php/webdav"
+      url = url + "/webdav"
+  elif url.find("remote.php") == -1 and url[-1:] != "/":
+    url = url + "/remote.php/webdav"
   else:
     return None
   r, c = http.request(url)
