@@ -53,7 +53,7 @@ class ownClient(object):
       self.good = False
       return
     self.good = True
-    obj = ET.XML(resp.content)
+    obj = ET.XML(resp.text)
     if obj.tag != "{DAV:}multistatus":
       return
     for i in obj.getchildren():
@@ -122,7 +122,7 @@ class ownClient(object):
     self.log.debug("Getting File contents: %s" % (path))
     resp = self.http(self.url + "/" + urlquote(path), 'GET')
     if resp.status_code == 200:
-      return resp.content
+      return resp.text
 
   def addFile(self, newFile, path):
     """
@@ -134,7 +134,7 @@ class ownClient(object):
     if path not in self.DIRS:
       self.mkdir(path)
     self.http(
-      str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", body=data)
+      str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", data=data)
 
   def getLocalDIRS(self, path):
     DIRS = dict()
