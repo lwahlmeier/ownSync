@@ -7,42 +7,40 @@ import shutil
 import time
 import xml.etree.ElementTree as ET
 
-import httplib2
+import socks
+import requests
 
 
 try:
+  from urllib.parse import urlparse
   from urllib.parse import unquote as urlunquote
   from urllib.parse import quote as urlquote
 except:
+  from urlparse import urlparse
   import urllib
   urlunquote = urllib.unquote
   urlquote = urllib.quote
-#  from urllib.urllib.unquote import unquote as urlunquote
-#  from urllib.quote import quote as urlquote
 
-
-class ownClient():
+class ownClient(object):
   """
   ownClient main class for the ownSync utility, it makes a connection to the
   ownCloud server and then allows modification and retrival of files.
   """
-  def __init__(self, url):
+  def __init__(self, url, username, password, verify_ssl=True):
     """
     The URL in http or https format to the owncloud server, the remote.php/webdav is required
     """
     self.log = logging.getLogger("root.ownClient")
     self.url = url
+    self.auth = (username, password)
     self.base = "/".join(url[8:].split("/")[1:])
-    self.http = httplib2.Http(disable_ssl_certificate_validation=True)
+    self.verify = verify_ssl
     self.good = False
     self.DIRS = dict()
     self.FILES = dict()
 
-  def set_auth(self, username, password):
-    """
-    Sets the username and password to use for the Client
-    """
-    self.http.add_credentials(username, password)
+  def http(self, url, method, **kwargs):
+    return requests.request(method, url, verify=self.verify, auth=self.auth, **kwargs)
 
   def updateTree(self, path="/"):
     """
@@ -50,12 +48,12 @@ class ownClient():
     """
     self.log.debug("updating Local DataTrees %s" % path)
     DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propfind xmlns:D='DAV:'><D:prop><D:allprop/></D:prop></D:propfind>"
-    r, c = self.http.request(self.url + "/" + path, 'PROPFIND')
-    if r['status'] != '207':
+    resp = self.http(self.url + "/" + path, 'PROPFIND')
+    if resp.status_code != 207:
       self.good = False
       return
     self.good = True
-    obj = ET.XML(c)
+    obj = ET.XML(resp.text)
     if obj.tag != "{DAV:}multistatus":
       return
     for i in obj.getchildren():
@@ -72,10 +70,6 @@ class ownClient():
               ETAG = X.find("{DAV:}etag")
               lastMod = X.find("{DAV:}getlastmodified")
               length = X.find("{DAV:}getcontentlength")
-#              if ID is not None:
-#                newEntry['id'] = ID.text
-#              if ETAG is not None:
-#                newEntry['etag'] = ETAG.text
               if lastMod is not None:
                 try:
                   fmt = "%a, %d %b %Y %H:%M:%S GMT"
@@ -105,30 +99,30 @@ class ownClient():
     """
     self.log.debug("Updating Modified time of %s to %d" % (path, ftime))
     DATA = "<?xml version='1.0' encoding='UTF-8' ?><D:propertyupdate xmlns:D='DAV:'><D:set><D:prop><D:lastmodified>%d</D:lastmodified></D:prop></D:set></D:propertyupdate>" % (ftime)
-    r, c = self.http.request(self.url + "/" + urlquote(path), 'PROPPATCH', body=DATA)
+    self.http(self.url + "/" + urlquote(path), 'PROPPATCH', data=DATA)
 
   def mkdir(self, path):
     """
     mkdir creates a dirctory on owncloud, it will create the full path even if parent directories do not exist
     """
     self.log.debug("Creating Path  %s" % (path))
-    r, c = self.http.request(self.url + "/" + urlquote(path), "MKCOL")
+    self.http(self.url + "/" + urlquote(path), "MKCOL")
 
   def delete(self, path):
     """
     delete deletes any path/file on the owncloud server, and will do so recursivly.
     """
     self.log.debug("Deleting Path %s" % (path))
-    r, c = self.http.request(self.url + "/" + urlquote(path), "DELETE")
+    self.http(self.url + "/" + urlquote(path), "DELETE")
 
   def getFile(self, path):
     """
     getFile retireves the contents of the give file
     """
     self.log.debug("Getting File contents: %s" % (path))
-    r, c = self.http.request(self.url + "/" + urlquote(path))
-    if r['status'] == "200":
-      return c
+    resp = self.http(self.url + "/" + urlquote(path), 'GET')
+    if resp.status_code == 200:
+      return resp.text
 
   def addFile(self, newFile, path):
     """
@@ -139,8 +133,8 @@ class ownClient():
     data = open(newFile, "rb").read()
     if path not in self.DIRS:
       self.mkdir(path)
-    r, c = self.http.request(
-      str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", body=data)
+    self.http(
+      str("{}/{}/{}".format(self.url, urlquote(path), urlquote(os.path.basename(newFile)))), "PUT", data=data)
 
   def getLocalDIRS(self, path):
     DIRS = dict()
@@ -317,11 +311,10 @@ def fixPath(path):
   return path
 
 
-def getOwn(url):
+def getOwn(url, verify=True):
   """
   Simple class to verify a url is an ownCloud instance
   """
-  http = httplib2.Http(disable_ssl_certificate_validation=True)
   if url.find("remote.php") == -1 and url[-1:] == "/":
     url = url + "remote.php/webdav"
   elif url.find("remote.php") != 1 and url[-1:] != "/":
@@ -331,7 +324,7 @@ def getOwn(url):
     url = url + "/remote.php/webdav"
   else:
     return None
-  r, c = http.request(url)
-  if r['status'] == '401' and r['www-authenticate'].find("ownCloud") != -1:
+  resp = requests.get(url, verify=verify)
+  if resp.status_code == 401 and resp.headers['www-authenticate'].find("ownCloud") != -1:
     return url
   return None
